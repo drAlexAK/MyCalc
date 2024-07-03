@@ -227,14 +227,22 @@ class MyClass
         {
             if ((int)ch <= 32) continue; // ignoring all blank chars
             var type = Token.GetType(ch.ToString());
-            TokenType typeOfLastElem = TokenType.Blank;
+            TokenType typeOfLastElem = TokenType.Operation;
             if (strings.Count() > 0)
             {
                 typeOfLastElem = Token.GetType(strings.Last().ToString());
             }
             if ((type & TokenType.Operation) > 0)
             {
-                strings.Add(new StringBuilder(ch.ToString()));
+                if (typeOfLastElem == TokenType.Blank)
+                {
+                    strings.Last().Append(ch);
+                }
+                else
+                {
+                    strings.Add(new StringBuilder(ch.ToString()));
+                }
+
                 if ((type & TokenType.Subtraction) > 0 && (typeOfLastElem & TokenType.Number) > 0)
                 {
                     strings.Add(new StringBuilder());
