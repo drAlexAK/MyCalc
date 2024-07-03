@@ -147,7 +147,7 @@ static class Operations
     public static MyOperations[] MapOfOperations =
         new MyOperations [2 * Math.Max((long)TokenType.Number, (long)TokenType.Operation) + 1];
 
-    public static TokenType[,] Priority;
+    public static TokenType[][][] Priority;
     
     static Operations()
     {
@@ -157,14 +157,22 @@ static class Operations
         MapOfOperations[(long)TokenType.Operation | (long)TokenType.Division] = Div;
         MapOfOperations[(long)TokenType.Operation | (long)TokenType.Exponentiation] = Exp;
         
-        Priority = new TokenType[,]
+        Priority = new TokenType[][][]
         {
-            {TokenType.BracketOpen, TokenType.Number, TokenType.BracketClose},
-            { TokenType.Number, TokenType.Exponentiation, TokenType.Number},
-            { TokenType.Number, TokenType.Multiplication, TokenType.Number},
-            { TokenType.Number, TokenType.Division, TokenType.Number},
-            { TokenType.Number, TokenType.Subtraction, TokenType.Number},
-            { TokenType.Number, TokenType.Addition, TokenType.Number}
+            new TokenType[][] {
+                new TokenType[] {TokenType.BracketOpen, TokenType.Number, TokenType.BracketClose}
+            },
+            new TokenType[][] {
+                new TokenType[] { TokenType.Number, TokenType.Exponentiation, TokenType.Number}
+            },
+            new TokenType[][] {
+                new TokenType[] { TokenType.Number, TokenType.Multiplication, TokenType.Number},
+                new TokenType[] { TokenType.Number, TokenType.Division, TokenType.Number}
+            },
+            new TokenType[][] {
+                new TokenType[] { TokenType.Number, TokenType.Subtraction, TokenType.Number},
+                new TokenType[] { TokenType.Number, TokenType.Addition, TokenType.Number}
+            }
         };
     }
 }
@@ -240,7 +248,7 @@ class MyClass
                     strings.Add(new StringBuilder(ch.ToString()));
                 }
 
-                if ((type & TokenType.Subtraction) > 0 && (typeOfLastElem & TokenType.Number) > 0)
+                if ((type & TokenType.Subtraction) > 0 && (((typeOfLastElem & TokenType.Number) > 0) || ((typeOfLastElem & TokenType.BracketClose) > 0)))
                 {
                     strings.Add(new StringBuilder());
                 }
@@ -276,25 +284,30 @@ class MyClass
             bool found = false;
             for (int prio = 0; prio < Operations.Priority.Length && !found; prio++)
             {
-                for (int id = 0; id + 2 < ListOfTokens.Count(); id++)
+                for (int id = 0; id + 2 < ListOfTokens.Count() && !found; id++)
                 {
-                    if ((ListOfTokens[id].Type & Operations.Priority[prio, 0]) > 0 &&
-                        (ListOfTokens[id + 1].Type & Operations.Priority[prio, 1]) > 0 &&
-                        (ListOfTokens[id + 2].Type & Operations.Priority[prio, 2]) > 0)
+                    for (int oper = 0; oper < Operations.Priority[prio].Length && !found; oper++)
                     {
-                        Number result;
-                        if ((Operations.Priority[prio, 0] & TokenType.BracketOpen) > 0)
+                        if ((ListOfTokens[id].Type & Operations.Priority[prio][oper][0]) > 0 &&
+                            (ListOfTokens[id + 1].Type & Operations.Priority[prio][oper][1]) > 0 &&
+                            (ListOfTokens[id + 2].Type & Operations.Priority[prio][oper][2]) > 0)
                         {
-                            result = new Number(ListOfTokens[id + 1].RawString);
+                            Number result;
+                            if ((Operations.Priority[prio][oper][0] & TokenType.BracketOpen) > 0)
+                            {
+                                result = new Number(ListOfTokens[id + 1].RawString);
+                            }
+                            else
+                            {
+                                result = Operations.MapOfOperations[(long)ListOfTokens[id + 1].Type](
+                                    new Number(ListOfTokens[id].RawString), new Number(ListOfTokens[id + 2].RawString));
+                            }
+
+                            ListOfTokens.RemoveRange(id, 3);
+                            ListOfTokens.Insert(id, new Token(result.ToString()));
+                            found = true;
+                            break;
                         }
-                        else
-                        {
-                            result = Operations.MapOfOperations[(long)ListOfTokens[id + 1].Type](new Number(ListOfTokens[id].RawString), new Number(ListOfTokens[id + 2].RawString));
-                        }
-                        ListOfTokens.RemoveRange(id, 3);
-                        ListOfTokens.Insert(id, new Token(result.ToString()));
-                        found = true;
-                        break;
                     }
                 }
             }
