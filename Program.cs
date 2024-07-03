@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO.MemoryMappedFiles;
 using System.Text;
 using Microsoft.VisualBasic;
 
@@ -100,18 +101,6 @@ class Number
 
 static class Operations
 {
-    private static long MyPower(long a, long b)
-    {
-        long res = 1;
-        long val = a;
-        while (b > 0)
-        {
-            if ((b & 1) > 0) res = res * val;
-            val = val * val;
-            b >>= 1;
-        }
-        return res;
-    }
     private static double EPS = 0.000000001;
     static public Number Sum(Number a, Number b)
     {
@@ -151,10 +140,6 @@ static class Operations
     }
     static public Number Exp(Number a, Number b)
     {
-        if (a.IsInteger && b.IsInteger)
-        {
-            return new Number(MyPower(a.iVal, b.iVal));
-        }
         return new Number(Math.Pow(a.dVal, b.dVal));
     }
     public delegate Number MyOperations(Number a, Number b);
@@ -162,6 +147,8 @@ static class Operations
     public static MyOperations[] MapOfOperations =
         new MyOperations [2 * Math.Max((long)TokenType.Number, (long)TokenType.Operation) + 1];
 
+    public static TokenType[,] Priority;
+    
     static Operations()
     {
         MapOfOperations[(long)TokenType.Operation | (long)TokenType.Addition] = Sum;
@@ -169,6 +156,16 @@ static class Operations
         MapOfOperations[(long)TokenType.Operation | (long)TokenType.Multiplication] = Mul;
         MapOfOperations[(long)TokenType.Operation | (long)TokenType.Division] = Div;
         MapOfOperations[(long)TokenType.Operation | (long)TokenType.Exponentiation] = Exp;
+        
+        Priority = new TokenType[,]
+        {
+            {TokenType.BracketOpen, TokenType.Number, TokenType.BracketClose},
+            { TokenType.Number, TokenType.Exponentiation, TokenType.Number},
+            { TokenType.Number, TokenType.Multiplication, TokenType.Number},
+            { TokenType.Number, TokenType.Division, TokenType.Number},
+            { TokenType.Number, TokenType.Subtraction, TokenType.Number},
+            { TokenType.Number, TokenType.Addition, TokenType.Number}
+        };
     }
 }
 
@@ -274,6 +271,39 @@ class MyClass
             Console.WriteLine(val.RawString);
         }
         Console.WriteLine("=====================");
-        Console.WriteLine(Operations.MapOfOperations[(long)ListOfTokens[1].Type](new Number(ListOfTokens[0].RawString), new Number(ListOfTokens[2].RawString)).ToString());
+        while (ListOfTokens.Count() > 1)
+        {
+            bool found = false;
+            for (int prio = 0; prio < Operations.Priority.Length && !found; prio++)
+            {
+                for (int id = 0; id + 2 < ListOfTokens.Count(); id++)
+                {
+                    if ((ListOfTokens[id].Type & Operations.Priority[prio, 0]) > 0 &&
+                        (ListOfTokens[id + 1].Type & Operations.Priority[prio, 1]) > 0 &&
+                        (ListOfTokens[id + 2].Type & Operations.Priority[prio, 2]) > 0)
+                    {
+                        Number result;
+                        if ((Operations.Priority[prio, 0] & TokenType.BracketOpen) > 0)
+                        {
+                            result = new Number(ListOfTokens[id + 1].RawString);
+                        }
+                        else
+                        {
+                            result = Operations.MapOfOperations[(long)ListOfTokens[id + 1].Type](new Number(ListOfTokens[id].RawString), new Number(ListOfTokens[id + 2].RawString));
+                        }
+                        ListOfTokens.RemoveRange(id, 3);
+                        ListOfTokens.Insert(id, new Token(result.ToString()));
+                        found = true;
+                        break;
+                    }
+                }
+            }
+
+            if (found == false)
+            {
+                // TODO ERROR OF INCORRECT Equation
+            }
+        }
+        Console.WriteLine(ListOfTokens[0].RawString);
     }
 }
